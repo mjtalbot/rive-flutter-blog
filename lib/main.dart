@@ -24,7 +24,7 @@ class MyRiveAnimation extends StatefulWidget {
 class _MyRiveAnimationState extends State<MyRiveAnimation> {
   final riveFileName = 'assets/truck.riv';
   Artboard _artboard;
-  RiveAnimationController _wipersController;
+  WiperAnimation _wipersController;
   // Flag to turn wipers on and off
   bool _wipers = false;
 
@@ -54,10 +54,15 @@ class _MyRiveAnimationState extends State<MyRiveAnimation> {
       // Add an additional controller onto the artboard, the controller
       // auto plays once added
       _artboard.addController(
-        _wipersController = SimpleAnimation('windshield_wipers'),
+        _wipersController = WiperAnimation('windshield_wipers'),
       );
     }
-    setState(() => _wipersController.isActive = _wipers = wipersOn);
+    if (wipersOn) {
+      _wipersController.start();
+    } else {
+      _wipersController.stop();
+    }
+    setState(() => _wipers = wipersOn);
   }
 
   /// Show the rive file, when loaded
@@ -84,5 +89,22 @@ class _MyRiveAnimationState extends State<MyRiveAnimation> {
         ),
       ],
     );
+  }
+}
+
+class WiperAnimation extends SimpleAnimation {
+  WiperAnimation(String animationName) : super(animationName);
+
+  start() {
+    // When starting the wiper animation we want the loop mode to be 'loop'
+    // and set the animation to be active.
+    instance.animation.loop = Loop.loop;
+    isActive = true;
+  }
+
+  stop() {
+    // We want the animation to play to the end of its loop
+    // so we set the loop mode to oneShot.
+    instance.animation.loop = Loop.oneShot;
   }
 }
