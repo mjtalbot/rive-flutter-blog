@@ -24,6 +24,9 @@ class MyRiveAnimation extends StatefulWidget {
 class _MyRiveAnimationState extends State<MyRiveAnimation> {
   final riveFileName = 'assets/truck.riv';
   Artboard _artboard;
+  RiveAnimationController _wipersController;
+  // Flag to turn wipers on and off
+  bool _wipers = false;
 
   @override
   void initState() {
@@ -46,14 +49,40 @@ class _MyRiveAnimationState extends State<MyRiveAnimation> {
     }
   }
 
+  void _wipersChange(bool wipersOn) {
+    if (_wipersController == null) {
+      // Add an additional controller onto the artboard, the controller
+      // auto plays once added
+      _artboard.addController(
+        _wipersController = SimpleAnimation('windshield_wipers'),
+      );
+    }
+    setState(() => _wipersController.isActive = _wipers = wipersOn);
+  }
+
   /// Show the rive file, when loaded
   @override
   Widget build(BuildContext context) {
-    return _artboard != null
-        ? Rive(
-            artboard: _artboard,
-            fit: BoxFit.cover,
-          )
-        : Container();
+    return Column(
+      children: [
+        Expanded(
+          child: _artboard != null
+              ? Rive(
+                  artboard: _artboard,
+                  fit: BoxFit.cover,
+                )
+              : Container(),
+        ),
+        SizedBox(
+          height: 50,
+          width: 200,
+          child: SwitchListTile(
+            title: const Text('Wipers'),
+            value: _wipers,
+            onChanged: _wipersChange,
+          ),
+        ),
+      ],
+    );
   }
 }
