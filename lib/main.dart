@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:rive/rive.dart';
@@ -25,8 +27,12 @@ class _MyRiveAnimationState extends State<MyRiveAnimation> {
   final riveFileName = 'assets/truck.riv';
   Artboard _artboard;
   WiperAnimation _wipersController;
+  TruckController _truckController;
   // Flag to turn wipers on and off
   bool _wipers = false;
+
+  // Flag to turn suspension on and off
+  bool _suspension = false;
 
   @override
   void initState() {
@@ -65,6 +71,22 @@ class _MyRiveAnimationState extends State<MyRiveAnimation> {
     setState(() => _wipers = wipersOn);
   }
 
+  void _suspensionChange(bool suspensionOn) {
+    if (_truckController == null) {
+      // Add an additional controller onto the artboard, the controller
+      // auto plays once added
+      _artboard.addController(
+        _truckController = TruckController(),
+      );
+    }
+    if (suspensionOn) {
+      _truckController.suspensionOn = suspensionOn;
+    } else {
+      _truckController.suspensionOn = suspensionOn;
+    }
+    setState(() => _suspension = suspensionOn);
+  }
+
   /// Show the rive file, when loaded
   @override
   Widget build(BuildContext context) {
@@ -78,14 +100,27 @@ class _MyRiveAnimationState extends State<MyRiveAnimation> {
                 )
               : Container(),
         ),
-        SizedBox(
-          height: 50,
-          width: 200,
-          child: SwitchListTile(
-            title: const Text('Wipers'),
-            value: _wipers,
-            onChanged: _wipersChange,
-          ),
+        Row(
+          children: [
+            SizedBox(
+              height: 50,
+              width: 200,
+              child: SwitchListTile(
+                title: const Text('Wipers'),
+                value: _wipers,
+                onChanged: _wipersChange,
+              ),
+            ),
+            SizedBox(
+              height: 50,
+              width: 200,
+              child: SwitchListTile(
+                title: const Text('Suspension'),
+                value: _suspension,
+                onChanged: _suspensionChange,
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -106,5 +141,78 @@ class WiperAnimation extends SimpleAnimation {
     // We want the animation to play to the end of its loop
     // so we set the loop mode to oneShot.
     instance.animation.loop = Loop.oneShot;
+  }
+}
+
+class TruckController extends RiveAnimationController<RuntimeArtboard> {
+  LinearAnimationInstance _suspensionAnimation;
+  TruckController();
+
+  var _suspensionOn = false;
+  bool get suspensionOn => _suspensionOn;
+  set suspensionOn(bool suspensionOn) {
+    _suspensionOn = suspensionOn;
+  }
+
+  LinearAnimationInstance _getAnimationInstance(
+      RuntimeArtboard artboard, String animationName) {
+    var animation = artboard.animations.firstWhere(
+      (animation) =>
+          animation is LinearAnimation && animation.name == animationName,
+      orElse: () => null,
+    );
+    if (animation != null) {
+      return LinearAnimationInstance(animation as LinearAnimation);
+    }
+    return null;
+  }
+
+  @override
+  bool init(RuntimeArtboard artboard) {
+    _suspensionAnimation = _getAnimationInstance(artboard, 'bouncing');
+    isActive = true;
+    return _suspensionAnimation != null;
+  }
+
+  @override
+  void apply(RuntimeArtboard artboard, double elapsedSeconds) {
+    if (suspensionOn) {
+      _suspensionAnimation.animation.apply(
+        _suspensionAnimation.time,
+        coreContext: artboard,
+        mix: 1.0,
+      );
+      _suspensionAnimation.advance(elapsedSeconds);
+    }
+  }
+
+  @override
+  void dispose() {}
+
+  @override
+  void onActivate() {}
+
+  @override
+  void onDeactivate() {}
+}
+
+class LinearMixer {
+  final double start;
+  final double finish;
+  final double duration;
+  double time;
+  double mixValue;
+
+  LinearMixer(this.start, this.finish, this.duration)
+      : time = 0,
+        mixValue = start;
+
+  void apply(double elapsedTime) {
+    if (time > duration) {
+      return;
+    }
+    time += elapsedTime;
+    var completion = (min(time, duration)) / (duration);
+    mixValue = (finish - start) * completion + start;
   }
 }
