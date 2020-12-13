@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -149,9 +150,24 @@ class TruckController extends RiveAnimationController<RuntimeArtboard> {
   TruckController();
 
   var _suspensionOn = false;
+  AnimationSmoother suspensionAnimationSmoother;
   bool get suspensionOn => _suspensionOn;
   set suspensionOn(bool suspensionOn) {
     _suspensionOn = suspensionOn;
+    var lastSmoothingValue = suspensionAnimationSmoother?.value ?? 0;
+    if (_suspensionOn) {
+      suspensionAnimationSmoother = AnimationSmoother(
+        start: lastSmoothingValue,
+        finish: 1,
+        duration: 3,
+      );
+    } else {
+      suspensionAnimationSmoother = AnimationSmoother(
+        start: lastSmoothingValue,
+        finish: 0,
+        duration: remainingAnimationTime(_suspensionAnimation),
+      );
+    }
   }
 
   LinearAnimationInstance _getAnimationInstance(
@@ -169,20 +185,23 @@ class TruckController extends RiveAnimationController<RuntimeArtboard> {
 
   @override
   bool init(RuntimeArtboard artboard) {
-    _suspensionAnimation = _getAnimationInstance(artboard, 'bouncing');
     isActive = true;
+    _suspensionAnimation = _getAnimationInstance(artboard, 'bouncing');
     return _suspensionAnimation != null;
   }
 
   @override
   void apply(RuntimeArtboard artboard, double elapsedSeconds) {
-    if (suspensionOn) {
-      _suspensionAnimation.animation.apply(
-        _suspensionAnimation.time,
-        coreContext: artboard,
-        mix: 1.0,
-      );
-      _suspensionAnimation.advance(elapsedSeconds);
+    if (suspensionAnimationSmoother != null) {
+      if (suspensionAnimationSmoother.value > 0) {
+        _suspensionAnimation.animation.apply(
+          _suspensionAnimation.time,
+          coreContext: artboard,
+          mix: suspensionAnimationSmoother.value,
+        );
+        _suspensionAnimation.advance(elapsedSeconds);
+      }
+      suspensionAnimationSmoother.apply(elapsedSeconds);
     }
   }
 
@@ -196,23 +215,35 @@ class TruckController extends RiveAnimationController<RuntimeArtboard> {
   void onDeactivate() {}
 }
 
-class LinearMixer {
+double remainingAnimationTime(LinearAnimationInstance animationInstance) {
+  final animation = animationInstance.animation;
+  final startInFrames = animation.workStart;
+  final durationInFrames = animation.duration;
+  var remainingAnimationFrames = durationInFrames -
+      (animationInstance.time * animation.fps - startInFrames);
+  if (remainingAnimationFrames < 2 * animation.fps) {
+    remainingAnimationFrames += animation.duration;
+  }
+  return remainingAnimationFrames / animation.fps;
+}
+
+class AnimationSmoother {
   final double start;
   final double finish;
-  final double duration;
-  double time;
-  double mixValue;
 
-  LinearMixer(this.start, this.finish, this.duration)
-      : time = 0,
-        mixValue = start;
+  final double duration;
+  double currentTime = 0;
+  double value;
+
+  AnimationSmoother({
+    this.start,
+    this.finish,
+    this.duration,
+  }) : value = start;
 
   void apply(double elapsedTime) {
-    if (time > duration) {
-      return;
-    }
-    time += elapsedTime;
-    var completion = (min(time, duration)) / (duration);
-    mixValue = (finish - start) * completion + start;
+    if (currentTime > duration) return;
+    currentTime += elapsedTime;
+    value = lerpDouble(start, finish, currentTime / duration);
   }
 }
